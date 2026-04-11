@@ -1,0 +1,21 @@
+{
+  "name": "fermaconnect-api",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fattgg/fermaconnect-api.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/fattgg/fermaconnect-api/issues"
+  },
+  "homepage": "https://github.com/fattgg/fermaconnect-api#readme"
+}
