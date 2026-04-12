@@ -43,6 +43,10 @@ app.use((req, res) => {
 app.use((err, req, res, next) => {
   console.error(err.stack);
 
+  if (err.code === '22P02') {
+    return res.status(400).json({ message: 'Invalid ID format' });
+  }
+
   const status  = err.status  || 500;
   const message = err.message || 'Internal server error';
 

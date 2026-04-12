@@ -103,7 +103,39 @@ const getProducts = async (query) => {
 };
 
 const getProductById = async (id) => {
-  return { message: 'getProductById — coming in Step 3.4' };
+  const result = await db.query(
+    `SELECT
+      p.id,
+      p.name,
+      p.category,
+      p.description,
+      p.price,
+      p.unit,
+      p.quantity,
+      p.available,
+      p.photo_urls,
+      p.created_at,
+      p.updated_at,
+      json_build_object(
+        'id',           u.id,
+        'name',         u.name,
+        'phone',        u.phone,
+        'municipality', u.municipality,
+        'avatar_url',   u.avatar_url
+      ) AS farmer
+    FROM products p
+    JOIN users u ON u.id = p.farmer_id
+    WHERE p.id = $1`,
+    [id]
+  );
+
+  if (!result.rows[0]) {
+    const err = new Error('Product not found');
+    err.status = 404;
+    throw err;
+  }
+
+  return result.rows[0];
 };
 
 const createProduct = async (body, files, farmerId) => {
