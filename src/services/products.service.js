@@ -241,11 +241,68 @@ const updateProduct = async (id, body, files, farmerId) => {
 };
 
 const deleteProduct = async (id, farmerId) => {
-  return { message: 'deleteProduct — coming in Step 3.7' };
+  const existing = await db.query(
+    'SELECT * FROM products WHERE id = $1',
+    [id]
+  );
+
+  if (!existing.rows[0]) {
+    const err = new Error('Product not found');
+    err.status = 404;
+    throw err;
+  }
+
+  if (existing.rows[0].farmer_id !== farmerId) {
+    const err = new Error('You are not allowed to delete this product');
+    err.status = 403;
+    throw err;
+  }
+
+  const photoUrls = existing.rows[0].photo_urls || [];
+  if (photoUrls.length > 0) {
+    const { cloudinary } = require('../config/cloudinary');
+
+    const deletePromises = photoUrls.map((url) => {
+      const parts    = url.split('/');
+      const filename = parts[parts.length - 1];
+      const folder   = parts[parts.length - 2];
+      const publicId = `${folder}/${filename.split('.')[0]}`;
+      return cloudinary.uploader.destroy(publicId);
+    });
+
+    await Promise.all(deletePromises);
+  }
+
+  await db.query('DELETE FROM products WHERE id = $1', [id]);
 };
 
 const toggleAvailability = async (id, farmerId) => {
-  return { message: 'toggleAvailability — coming in Step 3.7' };
+  const existing = await db.query(
+    'SELECT * FROM products WHERE id = $1',
+    [id]
+  );
+
+  if (!existing.rows[0]) {
+    const err = new Error('Product not found');
+    err.status = 404;
+    throw err;
+  }
+
+  if (existing.rows[0].farmer_id !== farmerId) {
+    const err = new Error('You are not allowed to update this product');
+    err.status = 403;
+    throw err;
+  }
+
+  const result = await db.query(
+    `UPDATE products
+     SET available = NOT available
+     WHERE id = $1
+     RETURNING *`,
+    [id]
+  );
+
+  return result.rows[0];
 };
 
 module.exports = {
