@@ -98,7 +98,20 @@ const login = async (data) => {
 };
 
 const getMe = async (id) => {
-  return { message: 'getMe – coming in Step 2.5' };
+  const result = await db.query(
+    `SELECT id, name, email, role, phone, municipality, avatar_url, created_at
+     FROM users
+     WHERE id = $1`,
+    [id]
+  );
+
+  if (!result.rows[0]) {
+    const err = new Error('User not found');
+    err.status = 404;
+    throw err;
+  }
+
+  return result.rows[0];
 };
 
 module.exports = { register, login, getMe, formatUser };
