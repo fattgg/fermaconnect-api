@@ -12,6 +12,9 @@ app.use(cors());
 app.use(morgan('dev'));
 app.use(express.json());
 
+const authRoutes = require('./routes/auth.routes');
+app.use('/api/auth', authRoutes);
+
 app.get('/health', async (req, res) => {
   const db = require('./db');
   try {
