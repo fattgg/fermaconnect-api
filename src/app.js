@@ -39,7 +39,17 @@ app.use((req, res) => {
 
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).json({ message: 'Internal server error' });
+
+  const status  = err.status  || 500;
+  const message = err.message || 'Internal server error';
+
+  const response = { message };
+
+  if (err.details) {
+    response.errors = err.details;
+  }
+
+  res.status(status).json(response);
 });
 
 module.exports = app;
