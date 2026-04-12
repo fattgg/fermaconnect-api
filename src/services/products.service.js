@@ -139,9 +139,39 @@ const getProductById = async (id) => {
 };
 
 const createProduct = async (body, files, farmerId) => {
-  return { message: 'createProduct — coming in Step 3.5' };
-};
+  const { error, value } = createProductSchema.validate(body, { abortEarly: false });
+  if (error) {
+    const err = new Error('Validation failed');
+    err.status = 422;
+    err.details = error.details.map((d) => d.message);
+    throw err;
+  }
 
+  const { name, category, description, price, unit, quantity } = value;
+
+  const photoUrls = files && files.length > 0
+    ? files.map((file) => file.path)
+    : [];
+
+  const result = await db.query(
+    `INSERT INTO products
+      (farmer_id, name, category, description, price, unit, quantity, photo_urls)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     RETURNING *`,
+    [
+      farmerId,
+      name,
+      category,
+      description || null,
+      price,
+      unit,
+      quantity,
+      JSON.stringify(photoUrls),
+    ]
+  );
+
+  return result.rows[0];
+};
 const updateProduct = async (id, body, files, farmerId) => {
   return { message: 'updateProduct — coming in Step 3.6' };
 };
