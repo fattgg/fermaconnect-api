@@ -2,7 +2,104 @@ const db = require('../db');
 const { createProductSchema, updateProductSchema } = require('../validations/products.validation');
 
 const getProducts = async (query) => {
-  return { message: 'getProducts — coming in Step 3.3' };
+  const {
+    category,
+    municipality,
+    search,
+    available = 'true',
+    page  = 1,
+    limit = 10,
+  } = query;
+
+  const conditions = [];
+  const values     = [];
+  let   paramIndex = 1;
+
+  if (available === 'true') {
+    conditions.push(`p.available = true`);
+  }
+
+  if (category) {
+    conditions.push(`p.category = $${paramIndex}`);
+    values.push(category.toLowerCase());
+    paramIndex++;
+  }
+
+  if (municipality) {
+    conditions.push(`u.municipality ILIKE $${paramIndex}`);
+    values.push(municipality);
+    paramIndex++;
+  }
+
+  if (search) {
+    conditions.push(
+      `(p.name ILIKE $${paramIndex} OR p.description ILIKE $${paramIndex})`
+    );
+    values.push(`%${search}%`);
+    paramIndex++;
+  }
+
+  const whereClause = conditions.length > 0
+    ? `WHERE ${conditions.join(' AND ')}`
+    : '';
+
+  const pageNum  = Math.max(1, parseInt(page));
+  const limitNum = Math.min(50, Math.max(1, parseInt(limit))); 
+  const offset   = (pageNum - 1) * limitNum;
+
+  const productsQuery = `
+    SELECT
+      p.id,
+      p.name,
+      p.category,
+      p.description,
+      p.price,
+      p.unit,
+      p.quantity,
+      p.available,
+      p.photo_urls,
+      p.created_at,
+      json_build_object(
+        'id',           u.id,
+        'name',         u.name,
+        'municipality', u.municipality,
+        'avatar_url',   u.avatar_url
+      ) AS farmer
+    FROM products p
+    JOIN users u ON u.id = p.farmer_id
+    ${whereClause}
+    ORDER BY p.created_at DESC
+    LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+  `;
+
+  values.push(limitNum, offset);
+
+  const countQuery = `
+    SELECT COUNT(*) AS total
+    FROM products p
+    JOIN users u ON u.id = p.farmer_id
+    ${whereClause}
+  `;
+
+  const [productsResult, countResult] = await Promise.all([
+    db.query(productsQuery, values),
+    db.query(countQuery,    values.slice(0, -2)), 
+  ]);
+
+  const total      = parseInt(countResult.rows[0].total);
+  const totalPages = Math.ceil(total / limitNum);
+
+  return {
+    products: productsResult.rows,
+    meta: {
+      total,
+      page:        pageNum,
+      limit:       limitNum,
+      total_pages: totalPages,
+      has_next:    pageNum < totalPages,
+      has_prev:    pageNum > 1,
+    },
+  };
 };
 
 const getProductById = async (id) => {
