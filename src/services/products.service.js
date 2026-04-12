@@ -172,8 +172,72 @@ const createProduct = async (body, files, farmerId) => {
 
   return result.rows[0];
 };
+
 const updateProduct = async (id, body, files, farmerId) => {
-  return { message: 'updateProduct — coming in Step 3.6' };
+  const existing = await db.query(
+    'SELECT * FROM products WHERE id = $1',
+    [id]
+  );
+
+  if (!existing.rows[0]) {
+    const err = new Error('Product not found');
+    err.status = 404;
+    throw err;
+  }
+
+  if (existing.rows[0].farmer_id !== farmerId) {
+    const err = new Error('You are not allowed to edit this product');
+    err.status = 403;
+    throw err;
+  }
+
+  const { error, value } = updateProductSchema.validate(body, { abortEarly: false });
+  if (error) {
+    const err = new Error('Validation failed');
+    err.status = 422;
+    err.details = error.details.map((d) => d.message);
+    throw err;
+  }
+
+  const fields = [];
+  const values = [];
+  let   paramIndex = 1;
+
+  const allowedFields = ['name', 'category', 'description', 'price', 'unit', 'quantity'];
+
+  for (const field of allowedFields) {
+    if (value[field] !== undefined) {
+      fields.push(`${field} = $${paramIndex}`);
+      values.push(value[field]);
+      paramIndex++;
+    }
+  }
+
+  if (files && files.length > 0) {
+    const newUrls      = files.map((file) => file.path);
+    const existingUrls = existing.rows[0].photo_urls || [];
+    const merged       = [...existingUrls, ...newUrls].slice(0, 3);
+
+    fields.push(`photo_urls = $${paramIndex}`);
+    values.push(JSON.stringify(merged));
+    paramIndex++;
+  }
+
+  if (fields.length === 0) {
+    return existing.rows[0];
+  }
+
+  values.push(id);
+
+  const result = await db.query(
+    `UPDATE products
+     SET ${fields.join(', ')}
+     WHERE id = $${paramIndex}
+     RETURNING *`,
+    values
+  );
+
+  return result.rows[0];
 };
 
 const deleteProduct = async (id, farmerId) => {
