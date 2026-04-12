@@ -57,7 +57,6 @@ const register = async (data) => {
   );
 
   const newUser = result.rows[0];
-
   const token = signToken(newUser);
 
   return {
@@ -67,7 +66,35 @@ const register = async (data) => {
 };
 
 const login = async (data) => {
-  return { message: 'login – coming in Step 2.4' };
+  const { error, value } = loginSchema.validate(data, { abortEarly: false });
+  if (error) {
+    const err = new Error('Validation failed');
+    err.status = 422;
+    err.details = error.details.map((d) => d.message);
+    throw err;
+  }
+
+  const { email, password } = value;
+
+  const result = await db.query(
+    'SELECT * FROM users WHERE email = $1',
+    [email.toLowerCase()]
+  );
+
+  const user = result.rows[0];
+
+  if (!user || !(await bcrypt.compare(password, user.password))) {
+    const err = new Error('Invalid email or password');
+    err.status = 401;
+    throw err;
+  }
+
+  const token = signToken(user);
+
+  return {
+    token,
+    user: formatUser(user),
+  };
 };
 
 const getMe = async (id) => {
