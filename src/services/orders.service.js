@@ -132,11 +132,115 @@ const getOrders = async (user) => {
 };
 
 const getOrderById = async (id, user) => {
-  return { message: '3' };
+  const result = await db.query(
+    `SELECT
+      o.id,
+      o.quantity,
+      o.status,
+      o.note,
+      o.contact_info,
+      o.created_at,
+      o.updated_at,
+      json_build_object(
+        'id',          p.id,
+        'name',        p.name,
+        'price',       p.price,
+        'unit',        p.unit,
+        'photo_urls',  p.photo_urls,
+        'farmer_id',   u.id,
+        'farmer_name', u.name,
+        'farmer_phone', u.phone
+      ) AS product,
+      json_build_object(
+        'id',    b.id,
+        'name',  b.name,
+        'phone', b.phone
+      ) AS buyer
+    FROM orders o
+    JOIN products p ON p.id = o.product_id
+    JOIN users    u ON u.id = p.farmer_id
+    JOIN users    b ON b.id = o.buyer_id
+    WHERE o.id = $1`,
+    [id]
+  );
+
+  const order = result.rows[0];
+
+  if (!order) {
+    const err = new Error('Order not found');
+    err.status = 404;
+    throw err;
+  }
+
+  const isBuyer  = order.buyer.id   === user.id;
+  const isFarmer = order.product.farmer_id === user.id;
+
+  if (!isBuyer && !isFarmer) {
+    const err = new Error('You are not allowed to view this order');
+    err.status = 403;
+    throw err;
+  }
+
+  return order;
 };
 
 const updateOrderStatus = async (id, body, farmerId) => {
-  return { message: '4' };
+  const { error, value } = updateStatusSchema.validate(body, { abortEarly: false });
+  if (error) {
+    const err = new Error('Validation failed');
+    err.status = 422;
+    err.details = error.details.map((d) => d.message);
+    throw err;
+  }
+
+  const { status } = value;
+
+  const existing = await db.query(
+    `SELECT o.*, p.farmer_id
+     FROM orders o
+     JOIN products p ON p.id = o.product_id
+     WHERE o.id = $1`,
+    [id]
+  );
+
+  const order = existing.rows[0];
+
+  if (!order) {
+    const err = new Error('Order not found');
+    err.status = 404;
+    throw err;
+  }
+
+  if (order.farmer_id !== farmerId) {
+    const err = new Error('You are not allowed to update this order');
+    err.status = 403;
+    throw err;
+  }
+
+  const validTransitions = {
+    pending:  ['accepted', 'rejected'],
+    accepted: ['completed'],
+    rejected: [],
+    completed: [],
+  };
+
+  if (!validTransitions[order.status].includes(status)) {
+    const err = new Error(
+      `Cannot transition from "${order.status}" to "${status}"`
+    );
+    err.status = 400;
+    throw err;
+  }
+
+  const result = await db.query(
+    `UPDATE orders
+     SET status = $1
+     WHERE id = $2
+     RETURNING *`,
+    [status, id]
+  );
+
+  return result.rows[0];
 };
 
 module.exports = {
