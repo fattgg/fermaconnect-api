@@ -15,10 +15,12 @@ app.use(express.json());
 const authRoutes     = require('./routes/auth.routes');
 const productsRoutes = require('./routes/products.routes');
 const ordersRoutes   = require('./routes/orders.routes');
+const farmersRoutes  = require('./routes/farmers.routes');
 
 app.use('/api/auth',     authRoutes);
 app.use('/api/products', productsRoutes);
 app.use('/api/orders',   ordersRoutes);
+app.use('/api/farmers',  farmersRoutes);
 
 app.get('/health', async (req, res) => {
   const db = require('./db');
