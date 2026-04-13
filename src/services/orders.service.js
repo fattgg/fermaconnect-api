@@ -69,7 +69,66 @@ const createOrder = async (body, buyerId) => {
 };
 
 const getOrders = async (user) => {
-  return { message: '2' };
+  let result;
+
+  if (user.role === 'buyer') {
+    result = await db.query(
+      `SELECT
+        o.id,
+        o.quantity,
+        o.status,
+        o.note,
+        o.contact_info,
+        o.created_at,
+        o.updated_at,
+        json_build_object(
+          'id',          p.id,
+          'name',        p.name,
+          'price',       p.price,
+          'unit',        p.unit,
+          'photo_urls',  p.photo_urls,
+          'farmer_name', u.name,
+          'farmer_id',   u.id
+        ) AS product
+      FROM orders o
+      JOIN products p ON p.id = o.product_id
+      JOIN users    u ON u.id = p.farmer_id
+      WHERE o.buyer_id = $1
+      ORDER BY o.created_at DESC`,
+      [user.id]
+    );
+  } else {
+    result = await db.query(
+      `SELECT
+        o.id,
+        o.quantity,
+        o.status,
+        o.note,
+        o.contact_info,
+        o.created_at,
+        o.updated_at,
+        json_build_object(
+          'id',         p.id,
+          'name',       p.name,
+          'price',      p.price,
+          'unit',       p.unit,
+          'photo_urls', p.photo_urls
+        ) AS product,
+        json_build_object(
+          'id',    b.id,
+          'name',  b.name,
+          'phone', b.phone
+        ) AS buyer
+      FROM orders o
+      JOIN products p ON p.id = o.product_id
+      JOIN users    b ON b.id = o.buyer_id
+      WHERE p.farmer_id = $1
+      ORDER BY o.created_at DESC`,
+      [user.id]
+    );
+  }
+
+  return { orders: result.rows };
 };
 
 const getOrderById = async (id, user) => {
