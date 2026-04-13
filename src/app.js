@@ -14,9 +14,11 @@ app.use(express.json());
 
 const authRoutes     = require('./routes/auth.routes');
 const productsRoutes = require('./routes/products.routes');
+const ordersRoutes   = require('./routes/orders.routes');
 
 app.use('/api/auth',     authRoutes);
 app.use('/api/products', productsRoutes);
+app.use('/api/orders',   ordersRoutes);
 
 app.get('/health', async (req, res) => {
   const db = require('./db');
