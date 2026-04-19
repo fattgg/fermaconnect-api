@@ -140,8 +140,7 @@ const getProductById = async (id) => {
 
 const createProduct = async (body, files, farmerId) => {
   const { error, value } = createProductSchema.validate(body, { abortEarly: false, convert: true });
-  console.log('BODY RECEIVED:', body);
-  console.log('VALIDATION ERROR:', error?.details);
+
   if (error) {
     const err = new Error('Validation failed');
     err.status = 422;
@@ -176,7 +175,6 @@ const createProduct = async (body, files, farmerId) => {
 };
 
 const updateProduct = async (id, body, files, farmerId) => {
-    console.log('updateProduct called with id:', id, 'farmerId:', farmerId);
   const existing = await db.query(
     'SELECT * FROM products WHERE id = $1',
     [id]
