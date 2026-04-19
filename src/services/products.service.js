@@ -176,6 +176,7 @@ const createProduct = async (body, files, farmerId) => {
 };
 
 const updateProduct = async (id, body, files, farmerId) => {
+    console.log('updateProduct called with id:', id, 'farmerId:', farmerId);
   const existing = await db.query(
     'SELECT * FROM products WHERE id = $1',
     [id]
