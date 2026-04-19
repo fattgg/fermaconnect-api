@@ -193,6 +193,8 @@ const updateProduct = async (id, body, files, farmerId) => {
     throw err;
   }
 
+  console.log('UPDATE BODY RECEIVED:', body);
+
   const { error, value } = createProductSchema.validate(body, { abortEarly: false, convert: true });
   if (error) {
     const err = new Error('Validation failed');
