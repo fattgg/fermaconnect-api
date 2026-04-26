@@ -1,10 +1,16 @@
-const db = require('../db');
-const { createOrderSchema, updateStatusSchema } = require('../validations/orders.validation');
+const db = require("../db");
+const {
+  createOrderSchema,
+  updateStatusSchema,
+} = require("../validations/orders.validation");
+const { sendPushNotification } = require("../utils/notifications");
 
 const createOrder = async (body, buyerId) => {
-  const { error, value } = createOrderSchema.validate(body, { abortEarly: false });
+  const { error, value } = createOrderSchema.validate(body, {
+    abortEarly: false,
+  });
   if (error) {
-    const err = new Error('Validation failed');
+    const err = new Error("Validation failed");
     err.status = 422;
     err.details = error.details.map((d) => d.message);
     throw err;
@@ -18,33 +24,35 @@ const createOrder = async (body, buyerId) => {
      FROM products p
      JOIN users u ON u.id = p.farmer_id
      WHERE p.id = $1`,
-    [product_id]
+    [product_id],
   );
+  const buyerResult = await db.query("SELECT name FROM users WHERE id = $1", [
+    buyerId,
+  ]);
+  const buyer = buyerResult.rows[0];
 
   const product = productResult.rows[0];
 
   if (!product) {
-    const err = new Error('Product not found');
+    const err = new Error("Product not found");
     err.status = 404;
     throw err;
   }
 
   if (!product.available) {
-    const err = new Error('This product is not available');
+    const err = new Error("This product is not available");
     err.status = 400;
     throw err;
   }
 
   if (product.farmer_id === buyerId) {
-    const err = new Error('You cannot order your own product');
+    const err = new Error("You cannot order your own product");
     err.status = 400;
     throw err;
   }
 
   if (quantity > product.quantity) {
-    const err = new Error(
-      `Only ${product.quantity} units available`
-    );
+    const err = new Error(`Only ${product.quantity} units available`);
     err.status = 400;
     throw err;
   }
@@ -53,17 +61,31 @@ const createOrder = async (body, buyerId) => {
     `INSERT INTO orders (buyer_id, product_id, quantity, contact_info, note)
      VALUES ($1, $2, $3, $4, $5)
      RETURNING *`,
-    [buyerId, product_id, quantity, contact_info, note || null]
+    [buyerId, product_id, quantity, contact_info, note || null],
   );
 
   const order = result.rows[0];
 
+  const farmerResult = await db.query(
+    "SELECT push_token, name FROM users WHERE id = $1",
+    [product.farmer_id],
+  );
+  const farmer = farmerResult.rows[0];
+
+  if (farmer?.push_token) {
+    await sendPushNotification(
+      farmer.push_token,
+      "🛒 New Order Request",
+      `${buyer?.name || "A buyer"} requested ${quantity} ${product.unit || ""} of ${product.name}`,
+    );
+  }
+
   return {
     ...order,
     product: {
-      id:           product.id,
-      name:         product.name,
-      farmer_name:  product.farmer_name,
+      id: product.id,
+      name: product.name,
+      farmer_name: product.farmer_name,
     },
   };
 };
@@ -71,7 +93,7 @@ const createOrder = async (body, buyerId) => {
 const getOrders = async (user) => {
   let result;
 
-  if (user.role === 'buyer') {
+  if (user.role === "buyer") {
     result = await db.query(
       `SELECT
         o.id,
@@ -95,7 +117,7 @@ const getOrders = async (user) => {
       JOIN users    u ON u.id = p.farmer_id
       WHERE o.buyer_id = $1
       ORDER BY o.created_at DESC`,
-      [user.id]
+      [user.id],
     );
   } else {
     result = await db.query(
@@ -124,7 +146,7 @@ const getOrders = async (user) => {
       JOIN users    b ON b.id = o.buyer_id
       WHERE p.farmer_id = $1
       ORDER BY o.created_at DESC`,
-      [user.id]
+      [user.id],
     );
   }
 
@@ -161,22 +183,22 @@ const getOrderById = async (id, user) => {
     JOIN users    u ON u.id = p.farmer_id
     JOIN users    b ON b.id = o.buyer_id
     WHERE o.id = $1`,
-    [id]
+    [id],
   );
 
   const order = result.rows[0];
 
   if (!order) {
-    const err = new Error('Order not found');
+    const err = new Error("Order not found");
     err.status = 404;
     throw err;
   }
 
-  const isBuyer  = order.buyer.id   === user.id;
+  const isBuyer = order.buyer.id === user.id;
   const isFarmer = order.product.farmer_id === user.id;
 
   if (!isBuyer && !isFarmer) {
-    const err = new Error('You are not allowed to view this order');
+    const err = new Error("You are not allowed to view this order");
     err.status = 403;
     throw err;
   }
@@ -185,9 +207,11 @@ const getOrderById = async (id, user) => {
 };
 
 const updateOrderStatus = async (id, body, farmerId) => {
-  const { error, value } = updateStatusSchema.validate(body, { abortEarly: false });
+  const { error, value } = updateStatusSchema.validate(body, {
+    abortEarly: false,
+  });
   if (error) {
-    const err = new Error('Validation failed');
+    const err = new Error("Validation failed");
     err.status = 422;
     err.details = error.details.map((d) => d.message);
     throw err;
@@ -200,33 +224,33 @@ const updateOrderStatus = async (id, body, farmerId) => {
      FROM orders o
      JOIN products p ON p.id = o.product_id
      WHERE o.id = $1`,
-    [id]
+    [id],
   );
 
   const order = existing.rows[0];
 
   if (!order) {
-    const err = new Error('Order not found');
+    const err = new Error("Order not found");
     err.status = 404;
     throw err;
   }
 
   if (order.farmer_id !== farmerId) {
-    const err = new Error('You are not allowed to update this order');
+    const err = new Error("You are not allowed to update this order");
     err.status = 403;
     throw err;
   }
 
   const validTransitions = {
-    pending:  ['accepted', 'rejected'],
-    accepted: ['completed'],
+    pending: ["accepted", "rejected"],
+    accepted: ["completed"],
     rejected: [],
     completed: [],
   };
 
   if (!validTransitions[order.status].includes(status)) {
     const err = new Error(
-      `Cannot transition from "${order.status}" to "${status}"`
+      `Cannot transition from "${order.status}" to "${status}"`,
     );
     err.status = 400;
     throw err;
@@ -237,8 +261,42 @@ const updateOrderStatus = async (id, body, farmerId) => {
      SET status = $1
      WHERE id = $2
      RETURNING *`,
-    [status, id]
+    [status, id],
   );
+  const buyerResult = await db.query(
+    `SELECT u.push_token, u.name, p.name AS product_name, 
+          fu.name AS farmer_name
+   FROM orders o
+   JOIN users u  ON u.id  = o.buyer_id
+   JOIN products p ON p.id = o.product_id
+   JOIN users fu ON fu.id = p.farmer_id
+   WHERE o.id = $1`,
+    [id],
+  );
+
+  const buyerData = buyerResult.rows[0];
+
+  if (buyerData?.push_token) {
+    const messages = {
+      accepted: {
+        title: "✓ Order Accepted",
+        body: `${buyerData.farmer_name} accepted your order for ${buyerData.product_name}`,
+      },
+      rejected: {
+        title: "✕ Order Rejected",
+        body: `${buyerData.farmer_name} rejected your order for ${buyerData.product_name}`,
+      },
+      completed: {
+        title: "📦 Order Completed",
+        body: `Your order for ${buyerData.product_name} has been completed`,
+      },
+    };
+
+    const msg = messages[status];
+    if (msg) {
+      await sendPushNotification(buyerData.push_token, msg.title, msg.body);
+    }
+  }
 
   return result.rows[0];
 };
