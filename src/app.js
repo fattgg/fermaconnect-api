@@ -18,6 +18,7 @@ const ordersRoutes = require("./routes/orders.routes");
 const farmersRoutes = require("./routes/farmers.routes");
 const usersRoutes = require("./routes/users.routes");
 const adminRoutes = require("./routes/admin.routes");
+const reviewsRoutes = require("./routes/reviews.routes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/products", productsRoutes);
@@ -25,6 +26,7 @@ app.use("/api/orders", ordersRoutes);
 app.use("/api/farmers", farmersRoutes);
 app.use("/api/users", usersRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/reviews", reviewsRoutes);
 
 app.get("/health", async (req, res) => {
   const db = require("./db");
